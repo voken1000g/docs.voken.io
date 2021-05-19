@@ -1,0 +1,47 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ 'main' ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      ruby-version: 2.7
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Set up Ruby
+        uses: actions/setup-ruby@v1
+        with:
+          ruby-version: ${{ env.ruby-version }}
+
+      - uses: actions/cache@v2
+        with:
+          path: vendor/bundle
+          key: gems-${{ runner.os }}-${{ matrix.ruby-version }}-${{ hashFiles('**/Gemfile.lock') }}
+          restore-keys: |
+            gems-${{ runner.os }}-${{ matrix.ruby-version }}-
+            gems-${{ runner.os }}-
+
+      - run: bundle config set deployment 'true'
+      - name: bundle install
+        run: |
+          bundle config path vendor/bundle
+          bundle install --jobs 4 --retry 3
+
+      - name: Build
+        run: bundle exec middleman build
+
+      - name: CNAME
+        run: echo "docs.voken.io" > ./build/CNAME
+
+      - name: Deploy
+        uses: JamesIves/github-pages-deploy-action@4.0.0
+        with:
+          commit-message: "@${{ github.sha }}"
+          branch: gh-pages
+          folder: build
